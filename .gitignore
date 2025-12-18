@@ -211,3 +211,6 @@ __marimo__/
 
 # NumPy
 *.npz
+
+# Internal
+code-comment-classification-*.csv
