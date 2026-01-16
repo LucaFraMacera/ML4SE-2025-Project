@@ -214,3 +214,4 @@ __marimo__/
 
 # Internal
 code-comment-classification-*.csv
+github_comments.csv
