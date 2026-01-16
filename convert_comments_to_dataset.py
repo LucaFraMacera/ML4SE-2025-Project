@@ -152,7 +152,7 @@ def main():
         partition = 0 if random.random() > 0.2 else 1
         
         # Instance Type
-        instance_type = 0
+        instance_type = 1
         
         # Category (New Classification Logic)
         category = classify_comment(comment_content)
