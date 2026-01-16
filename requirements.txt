@@ -113,3 +113,4 @@ umap-learn>=0.5.5
 xgboost>=1.7.7
 lightgbm==4.4.0
 imbalanced-learn>=0.13.0
+PyGithub==2.5.0
