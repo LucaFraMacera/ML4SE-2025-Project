@@ -59,11 +59,13 @@ def get_processed_ids(filename):
     """
     Reads the existing CSV to find which (Repo, IssueID) pairs 
     have already been scraped.
-    Returns a set of strings: "owner/repo#123"
+    Also returns the name of the LAST repository found in the file.
     """
     processed = set()
+    last_repo = None
+
     if not os.path.exists(filename):
-        return processed
+        return processed, last_repo
 
     try:
         with open(filename, mode='r', encoding='utf-8') as f:
@@ -71,18 +73,17 @@ def get_processed_ids(filename):
             header = next(reader, None)
             for row in reader:
                 if row and len(row) > 1:
-                    # Row structure: [RepoName, IssueID, ...]
                     repo_name = row[0]
+                    last_repo = repo_name  # Continually update this to find the last one
                     try:
                         issue_num = row[1]
-                        # Store unique key: "facebook/react#102"
                         processed.add(f"{repo_name}#{issue_num}")
                     except ValueError:
                         pass
     except Exception as e:
         print(f"Warning: Could not read existing file: {e}")
     
-    return processed
+    return processed, last_repo
 
 def scrape_repo(g, repo_name, processed_keys):
     print(f"--- Starting: {repo_name} ---")
@@ -168,10 +169,19 @@ def main():
 
     # Load history once at the start to prevent re-reading file constantly
     print(f"Scanning {OUTPUT_FILE} for existing data...")
-    processed_keys = get_processed_ids(OUTPUT_FILE)
+    processed_keys, last_repo = get_processed_ids(OUTPUT_FILE)
     print(f"Found {len(processed_keys)} processed threads previously saved.")
+    
+    # Determine where to start
+    start_index = 0
+    if last_repo and last_repo in TARGET_REPOS:
+        start_index = TARGET_REPOS.index(last_repo)
+        print(f"--> Resuming session from repository: {last_repo}")
+    
+    # Slice the list to start from the last active repo
+    repos_to_process = TARGET_REPOS[start_index:]
 
-    for repo_to_scrape in TARGET_REPOS:
+    for repo_to_scrape in repos_to_process:
         scrape_repo(g, repo_to_scrape, processed_keys)
 
 if __name__ == "__main__":
