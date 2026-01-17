@@ -29,6 +29,8 @@ MANIFEST
 docs/*.aux
 docs/*.log
 docs/*.gz
+docs/*.out
+docs/*.toc
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
