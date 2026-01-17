@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 # --- CONFIGURATION ---
-ORIGINAL_FILE = "../datasets/code-comment-classification-original.csv"  # The existing dataset
+ORIGINAL_FILE = "../datasets/original-code-comment-classification.csv"  # The existing dataset
 NEW_DATA_FILE = "../datasets/classified_comments_dataset.csv"  # The new data you just generated
 OUTPUT_FILE   = "code-comment-classification_extended.csv" # The final merged file
 
