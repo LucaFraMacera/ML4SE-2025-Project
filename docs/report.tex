@@ -1,15 +1,148 @@
-%! Author = lucam
-%! Date = 17/01/2026
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amssymb}  % Required for checkmark and cross symbols
+\usepackage[hidelinks]{hyperref} 
+\title{
+Machine Learning for Model Driven Engineering 
+\\
+ \large Code Comment Classification Project Report
+}
+\author{Luca Francesco Macera, Calogero Carlino}
+\date{January 2026}
 
-% Preamble
-\documentclass[11pt]{article}
-
-% Packages
-\usepackage{amsmath}
-
-% Document
 \begin{document}
 
-\section{Hi}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introduction to the Problem}
+Software maintenance and evolution are highly dependent on understanding existing codebases. Code comments are a primary source of documentation, but they are often unstructured and heterogeneous. Automatically classifying code comments into functional categories (e.g., "Summary", "Usage", "Parameters") can significantly enhance automated software engineering tools, such as documentation generators and code understanding systems.
+
+The goal of this project is to build a machine learning pipeline to automatically classify source code comments into predefined categories. This task presents several challenges, including short and ambiguous text, semantic overlap between categories, and class imbalance.
+
+\section{Explanation of the Dataset}
+The project utilizes the \texttt{code-comment-classification.csv} dataset from the NLBSE’23 tool competition on code comment classification\footnote{https://nlbse2023.github.io/tools/}, where each row represent a sentence (aka an instance) and each sentence contains six columns as follow:
+\begin{enumerate}
+    \item \texttt{comment\_sentence\_id} is the unique sentence ID;
+    \item \texttt{class} is the class name referring to the source code file where the sentence comes from;
+    \item \texttt{comment\_sentence } is the actual sentence string, which is a part of a (multi-line) class comment;
+    \item \texttt{partition} is the dataset split in training and testing, \texttt{0} identifies training instances and \texttt{1} identifies testing instances, respectively;
+    \item \texttt{instance\_type} specifies if an instance actually belongs to the given category or not: \texttt{0} for negative and \texttt{1} for positive instances;
+    \item \texttt{category} is the ground-truth or oracle category.
+\end{enumerate}
+
+\section{Implementation}
+The project is implemented in Python using a Jupyter Notebook environment. The solution emphasizes modularity and data integrity, ensuring no data leakage during the training process. All the relevant code is available in the project repository\footnote{https://github.com/LucaFraMacera/ML4SE-2025-Project}.
+
+\subsection{Initial Dataset Manipulation}
+\subsubsection{Data Augmentation and Scaling}
+During the initial experimental phase, it was observed that the models trained solely on the original dataset yielded suboptimal performance, with accuracy metrics plateauing around 60\%. This limitation was primarily attributed to the small sample size (approximately 2,800 usable instances after preprocessing), which provided insufficient variance for the models to generalize effectively over the high-dimensional BERT embedding space.
+
+To address this data scarcity, a data augmentation strategy was implemented involving the following steps:
+\begin{enumerate}
+    \item \textbf{Repository Scraping}: We extracted additional source code comments from various public GitHub repositories to create a supplemental corpus of real-world data.
+    \item \textbf{LLM-Based Weak Supervision}: As the scraped comments lacked ground truth labels, we utilized a Large Language Model (LLM) to perform zero-shot classification. The LLM automatically annotated the raw comments into the project's target categories ("Summary", "Usage", "Parameters", etc.), effectively generating "silver standard" labels.
+    \item \textbf{Integration and Hardware Constraints}: The augmented data was merged with the original dataset, significantly increasing the volume of training instances. However, processing the dense vector embeddings for this expanded dataset exceeded the memory (RAM) limitations of the available local hardware.
+    \item \textbf{Strategic Downsampling}: To resolve the computational bottleneck, we applied a randomized downsampling technique. The dataset was iteratively reduced, preserving the class distribution, until the volume of data was compatible with our hardware resources while still remaining significantly larger and more diverse than the original baseline.
+\end{enumerate}
+
+\subsubsection{Cleaning}
+The preprocessing phase focused on ensuring data integrity and optimizing the label space for supervised learning.
+The raw dataset contained negative samples (\texttt{instance\_type=0}) which were removed to isolate the true labels \\ (\texttt{instance\_type=1}).
+To facilitate a rigorous experimental design, redundant metadata columns (such as the original \texttt{partition} attribute) were removed. This allowed for the implementation of an independent, stratified k-fold cross-validation strategy, ensuring that the model's performance was not biased by pre-existing data splits.\\
+Furthermore, an exhaustive deduplication process was performed to eliminate identical entries, a critical step to prevent data leakage between the training and evaluation subsets.
+
+A semantic similarity analysis was conducted using BERT embeddings to calculate the cosine similarity between category centroids. The analysis revealed a high similarity (0.82) between the "Usage" and "Expand" categories. Consequently, these two categories were automatically merged to reduce classifier confusion and improve label distinctness.
+
+\subsubsection{Encoding}
+The classification framework utilizes a multifaceted encoding pipeline to project code comments into a unified high-dimensional feature space. This hybrid strategy is designed to capture semantic depth, structural context, and explicit technical heuristics, resulting in a comprehensive and complete representational vector. By combining these diverse feature sets, the model follows the industry-standard practice of multi-modal feature fusion to achieve higher discriminative power than single-source models.
+
+\subsubsection{Text and Categorical Encoding}
+In alignment with current state-of-the-art NLP practices, the primary representation layer utilizes a transformer-based model to handle the inherent complexity of natural language. Specifically, the \texttt{all-MiniLM-L6-v2 model} is employed to generate dense embeddings, a technique widely recognized as superior to traditional bag-of-words or TF-IDF approaches due to its ability to capture latent contextual semantics. To provide the necessary structural context, this semantic vector is augmented with categorical data through the \textbf{One-Hot} encoding of the source \texttt{class} attribute. This transformation results in 306 additional features, representing a standard solution for incorporating non-textual environment variables into a machine learning pipeline. By merging these two components, the framework ensures the classifier evaluates both the linguistic intent and the specific source code origin of each comment.
+
+\subsubsection{Metadata Encoding}
+To complement the high-dimensional semantic representations provided by the BERT encoder, we incorporate a suite of handcrafted metadata features. This hybrid approach is predicated on the observation that structural and stylistic attributes of source code comments often provide orthogonal signals that latent embeddings may not fully prioritize.
+\begin{itemize}
+    \item \textbf{Lexical Complexity}: We calculate the \texttt{comment\_length} as a proxy for information density, distinguishing between concise operational notes and verbose documentation.
+    \item \textbf{Domain-specific Indicators}: The features \texttt{has\_params} and \texttt{has\_default} serve as boolean markers for API-related specifications, identifying comments that describe method signatures or initialization states.
+    \item \textbf{Structural Syntax}: Through the detection of \texttt{code\_symbols}, we quantify the technical orientation of the comment, identifying the presence of formal logic within the natural language.
+    \item \textbf{Action-Oriented Linguistics}: The \texttt{starts\_with\_verb} feature evaluates the presence of imperative phrasing, a common convention in documentation aimed at describing functional behaviour.
+\end{itemize}
+This augmented dataset allows for a multi-modal approach to classification, where the model simultaneously evaluates the latent semantic content of the text and the explicit structural metadata associated with it.
+
+\subsection{Model Training}
+The training process was designed to handle high-dimensional sparse data and significant class imbalance. The implementation relies on the \texttt{imbalanced-learn} library to ensure that resampling strategies are correctly applied within cross-validation loops, preventing data leakage.
+
+\subsection{Feature Representation and Data Loading}
+The classification models ingest the data in the form of sparse matrices to efficiently handle the high dimensionality produced by the embedding process. The training features are loaded from compressed \texttt{.npz} files, combining the dense BERT embeddings with the encoded metadata features. The target variables are read from CSV files and subsequently flattened into one-dimensional arrays using the ravel method, ensuring compatibility with the input requirements of Scikit-learn estimators.
+
+\subsection{Pipeline Architecture and Class Imbalance}
+To address the imbalanced distribution of the dataset, a specialized \texttt{ImbPipeline} was utilized rather than a standard Scikit-learn pipeline. This distinction is critical for the validity of the experiment as it allows for resampling steps to occur strictly during the fitting phase. A \texttt{RandomOverSampler} with a fixed random state of \texttt{42} is applied to the training folds only. This ensures that synthetic samples are generated exclusively from the training portion of the fold, leaving the validation fold in its original distribution and preventing data leakage.
+
+\subsection{Classification Architectures}
+Four distinct classification architectures were implemented to evaluate performance across different mathematical approaches. All models utilized a consistent random state to ensure comparable results.
+
+\subsubsection{Logistic Regression}
+This model served as the primary baseline for linear separability. It was configured with a high maximum iteration count of 2000 to ensure convergence on the high-dimensional feature space.
+
+\subsubsection{SGD Classifier}
+The Stochastic Gradient Descent Classifier was utilized with the hinge loss function. This configuration effectively functions as a linear Support Vector Machine optimized via gradient descent, making it particularly suitable for efficient processing of large sparse datasets.
+
+\subsubsection{Linear SVC}
+A standard Linear Support Vector Classification implementation was included to evaluate the effectiveness of finding a maximum-margin hyperplane in the embedding space. Unlike the SGD approximation, this model uses a dedicated linear kernel solver.
+
+\subsubsection{Random Forest Classifier}
+To test if a non-linear approach could capture complex relationships better than linear models, a Random Forest Classifier was employed. This ensemble method consisted of \texttt{100} decision trees.
+
+\subsection{Model Selection}
+To maximize the performance of the most promising architecture, an extensive Grid Search was performed on the Logistic Regression model using 5-fold cross-validation. The optimization targeted the \textbf{F1-Macro} score to ensure balanced performance across categories.
+
+The search space included:
+\begin{itemize}
+    \item \textbf{Regularization Strength}: Multiple values were tested to control overfitting.
+    \item \textbf{Solvers}: Comparison between \texttt{liblinear} (high variance) and lbfgs (multiclass).
+    \item \textbf{Penalties}: Both L1 (Lasso) and L2 (Ridge) regularization were evaluated.
+    \item \textbf{Balancing Strategy}: The model's native \texttt{class\_weight='balanced'} parameter was contrasted against the pipeline's oversampling strategy to determine the optimal method for handling class imbalance.
+\end{itemize}
+
+The best estimator identified by the Grid Search was then evaluated on the hold-out test set to produce the final accuracy and classification report.
+
+\section{Results}
+The empirical evaluation, summarized in Table \ref{tab:model_results}, demonstrates the effectiveness of the hybrid feature set. The results indicate that linear architectures are particularly well-suited for high-dimensional semantic spaces, significantly outperforming ensemble tree-based methods in this specific classification task.
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|l|c|c|c|c|}
+        \hline
+        \textbf{Model} & \textbf{Accuracy} & \textbf{Avg. Std. Deviation} & \textbf{Result} \\
+        \hline
+        \textbf{Logistic Regression} & \textbf{0.8323} & \textbf{0.0039} & \checkmark \textbf{Best} \\
+        \hline
+        Linear SVC & 0.8210 & 0.0075 & Close second \\
+        \hline
+        SGD Classifier & 0.8139 & 0.0197 & Moderate \\
+        \hline
+        Random Forest & 0.7944 & 0.0050 & $\times$ Worst \\
+        \hline
+    \end{tabular}
+    \label{tab:model_results}
+    \caption{Performance Comparison of Machine Learning Models}
+\end{table}
+
+Results have also shown a training accuracy of 90\% compared to an 82\% testing accuracy. While a gap is expected in complex classification tasks involving natural language, this margin suggests that the model has memorized some specific noise or patterns in the training data that do not generalize to the test set. However, since the testing accuracy remains high (\(>80\%\)), the model is not suffering from significant overfitting, nor is it underfitting (which would be characterized by poor scores on both sets).
+
+In conclusion, the model maintains a symmetrical performance profile. For most classes, \texttt{Precision} and \texttt{Recall} are very close (e.g., Class 3: \texttt{0.80} \texttt{Precision} vs \texttt{0.82} \texttt{Recall}). This consistency suggests the decision boundary is well-calibrated; the model is neither overly conservative (which would spike \texttt{Precision} but drop \texttt{Recall}) nor overly aggressive (which would spike \texttt{Recall} but drop \texttt{Precision}).
+
+\subsection{Key findings}
+The performance across models reveals several critical insights into the nature of code comment classification:
+\begin{itemize}
+    \item \textbf{Best Model}:  The superior performance of \textbf{Logistic Regression} ($83.2\%$ accuracy; $F_1 = 0.83$) suggests that the combination of BERT-derived latent semantics and engineered metadata creates a feature space that is largely linearly separable. While \textbf{Random Forest} is typically robust, its relative underperformance ($79.4\%$) may be attributed to the high dimensionality and sparsity of the one-hot encoded class context, which can dilute the splitting criteria in decision trees.
+    \item \textbf{Effectiveness of Merging}: The automated merging of the Usage and Expand categories, driven by our initial cosine similarity analysis ($0.82$), proved instrumental. By resolving this specific semantic overlap, we effectively reduced label noise, allowing the classifier to establish more distinct decision boundaries.
+    \item \textbf{Robustness and Generalization}: The low standard deviation observed in the winning model ($0.0039$) confirms that the performance is consistent across the \texttt{5-fold cross-validation}. This indicates that the feature enrichment strategy (integrating structural heuristics like \texttt{has\_params} and \texttt{starts\_with\_verb}) provided stable signals that generalize well with new and unseen data.
+\end{itemize}
+
+\subsection{Conclusion}
+This project demonstrates an effective pipeline for classifying source code comments by fusing deep semantic embeddings with structural metadata. By augmenting the dataset to 30,000 rows and optimizing the label space through similarity-based merging, we achieved a final accuracy of 83.23\%. The results confirm that for short-text software documentation, a large-scale augmented dataset combined with a hybrid feature set provides a reliable foundation for automated classification.
 
 \end{document}
