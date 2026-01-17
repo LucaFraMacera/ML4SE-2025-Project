@@ -50,7 +50,7 @@ import sys
 
 # --- CONFIGURATION ---
 INPUT_FILE = "source_code_comments.csv"
-OUTPUT_FILE = "classified_comments_dataset.csv"
+OUTPUT_FILE = "../datasets/classified_comments_dataset.csv"
 
 # Classification Keywords (Heuristic Rules)
 # We check these in order. If a match is found, we assign that class.

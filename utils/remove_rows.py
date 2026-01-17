@@ -37,8 +37,8 @@ def balance_dataset(file_path, output_path, target_column, target_count=5000):
 
 
 # --- Configuration ---
-INPUT_FILE = 'code-comment-classification.csv'
-OUTPUT_FILE = 'code-comment-classification-downsample.csv'
+INPUT_FILE = '../datasets/code-comment-classification.csv'
+OUTPUT_FILE = '../datasets/code-comment-classification.csv'
 CATEGORY_COL = 'category'  # Replace with your actual column name
 
 if __name__ == "__main__":
